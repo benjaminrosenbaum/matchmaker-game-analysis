@@ -125,14 +125,14 @@ print "%s remain in client cards, %s in visitor_cards" % (len(client_cards), len
 def print_cost_and_reward(client, visitor):
     m = match_cost(client, visitor)
     r = expected_match_reward(client, visitor)
-    vals = (client['rank'], visitor['rank'], m, r)
-    print "match cost & reward of a %s client to marry a %s visitor: %s, %s" % vals
+    vals = (client['rank'], visitor['rank'], m, chance_of_match(client, visitor), r)
+    print "%s client to marry a %s visitor: cost %s, chance %s, expected rwd %s" % vals
 
-print_cost_and_reward(boy(4), girl(6))
-print_cost_and_reward(boy(6), girl(6))
-print_cost_and_reward(boy(6), girl(4))
+print_cost_and_reward(boy(4.0), girl(6.0))
+print_cost_and_reward(boy(6.0), girl(6.0))
+print_cost_and_reward(boy(6.0), girl(4.0))
 print "queer match:"
-print_cost_and_reward(boy(4), boy(6)) 
+print_cost_and_reward(boy(4.0), boy(6.0)) 
 
 
 
