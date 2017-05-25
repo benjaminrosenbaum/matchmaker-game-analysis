@@ -1,5 +1,6 @@
 from random import shuffle
 from copy import deepcopy
+from functools import reduce
 
 #MATH
 def flatten(l):
@@ -33,6 +34,10 @@ def deal_from(deck, how_many):
 
 
 #MONEY
+def money(shem, gelt):
+    return {"shem": shem, "gelt": gelt}
+
+
 def is_free(money):
     return money["shem"] == 0 and money["gelt"] == 0
 
@@ -45,23 +50,53 @@ def kind(money):
     return "gelt" if (money["shem"] == 0) else "shem"
 
 
+def add_money(m1, m2):
+    return {"shem": m1["shem"] + m2["shem"], "gelt": m1["gelt"] + m2["gelt"]}
+
+
+def subtract_money(m1, m2):
+    return {"shem": m1["shem"] - m2["shem"], "gelt": m1["gelt"] - m2["gelt"]}
+
+
+def multiply_money(m, factor):
+    return {"shem": m["shem"] * factor, "gelt": m["gelt"] * factor}
+
+
+#BUDGET
+def starting_budget():
+    return {'liquid': money(2, 2), 'escrow': []}
+
+
+def cash_in(budget):
+    budget['liquid'] = reduce(add_money, budget['escrow'], budget['liquid'])
+    budget['escrow'] = []
+
+
 #AI
 def match_cost(client, visitor):
     if client['sex'] == visitor['sex']:
         return None
     marrying_down = client['rank'] - visitor['rank']
-    return { "shem": max(0, marrying_down), "gelt": max(0, -marrying_down)}
+    return {"shem": max(0, marrying_down), "gelt": max(0, -marrying_down)}
+
+
+def chance_of_match(client, visitor):
+    difference = abs(client["rank"] - visitor["rank"])
+    if difference == 0:
+        return 1
+    return max(0, (5 - min(2, difference))/4)
 
 
 def expected_match_reward(client, visitor):
     cost = match_cost(client, visitor)
-    if cost == None:
-        return None 
+    if cost is None:
+        return None
     if is_free(cost):
         return {"shem": 0, "gelt": 2.5}
     cost[kind(cost)] += visitor["rank"]
-    return flip(cost)
+    return multiply_money(flip(cost), chance_of_match(client, visitor))
 
+#def best_
 
 client_cards = get_deck()
 visitor_cards = get_deck()
@@ -70,8 +105,17 @@ handsize = 4
 num_visitors = 2
 
 my_hand = deal_from(client_cards, handsize)
+my_budget = starting_budget()
 your_hand = deal_from(client_cards, handsize)
+your_budget = starting_budget()
 visitors = deal_from(visitor_cards, num_visitors)
+
+#ETHAN WORK HERE
+
+
+#BEN WORK HERE
+
+
 
 
 
