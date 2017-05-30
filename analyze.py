@@ -83,21 +83,23 @@ def consider_stealing(player, best_play):
         for c_idx, claimed_card in enumerate(the_visitors['claimed_cards']):
             if claimed_card['owner'] is player:
                 continue
-            reward = expected_steal_reward(p_card, claimed_card)             
+            reward = expected_steal_reward(player, p_card, claimed_card)             
             if reward is not None:
                 if best_play == None or combine_resources(reward) >= combine_resources(best_play['reward']):                  
                     best_play = card_match(p_idx, c_idx, reward, 1)  
     return best_play
 
-def expected_steal_reward(p_card, claimed_card):
+def expected_steal_reward(player, p_card, claimed_card):
     if p_card['rank'] < claimed_card['p_card']['rank']: # must have a rank as high as opponent's card when stealing
-        return None
+        return None  
     if chance_of_match(p_card, claimed_card['v_card']) is None:
+        return None
+    cost = match_cost(p_card, claimed_card['v_card'])
+    if cost is not None and not can_afford(player['budget'], cost):
         return None
     reward = claimed_card['money']
     if(p_card['rank'] > claimed_card['v_card']['rank'] and claimed_card['money']['gelt'] is 0):
         reward = flip(reward)
-    reward = multiply_money(reward, 1.5) # take into account that a steal costs opponent money (but may also give opponent more money)
     reward = multiply_money(reward, chance_of_match(p_card, claimed_card['v_card']))
     reward = subtract_money(reward, money(2, 0))  # take in account the cost of stealing
     return reward
@@ -193,7 +195,8 @@ def find_best_play(player):
             if reward != None:
                 if best_play == None or is_more(reward, best_play['reward']):
                     best_play = card_match(player_idx, vis_idx, reward, 0)
-    best_play = consider_stealing(player, best_play)
+    if player['budget']['shem'] >= 2: # the cost of stealing                
+        best_play = consider_stealing(player, best_play)
     return best_play 
 
 def take_turn(player):
@@ -207,6 +210,7 @@ def take_turn(player):
         v_card = the_visitors['hand'][best_play['vis_idx']]
     else:    
         print "Planning to steal card!"  
+        budget = subtract_money(budget, money(2,0)) # cost of stealing
         v_card = the_visitors['claimed_cards'][best_play['vis_idx']]['v_card']
     budget = subtract_money(budget, match_cost(p_card,v_card))
     if random() <= chance_of_match(p_card,v_card):
