@@ -4,10 +4,14 @@ from random import randint
 from copy import deepcopy
 from functools import reduce
 
+
 #MATH
 def flatten(l):
     return [item for sublist in l for item in sublist]
 
+#PLAYERS
+def player(hand, budget):
+    return {'hand': hand, 'budget': budget }
 
 #PROSPECTS
 def boy(rank):
@@ -19,8 +23,13 @@ def girl(rank):
 def suits(value):
     return [{'rank': value, 'sex': 'm'}, {'rank': value, 'sex': 'f'}] * 2
 
-
 #CARDS
+def card(rank, sex):
+    return {'rank': rank, 'sex': sex }
+
+def claimed_visitor_card(owner, p_card, v_card, money): # owner: 0 = visitor, 1 = player1, 2 = player2
+    return { 'owner': owner, 'p_card': p_card, 'v_card': v_card, 'money': money}
+
 def get_deck():
     d = flatten([suits(a + 1) for a in range(7)])
     shuffle(d)
@@ -42,6 +51,9 @@ def money(shem, gelt):
 def is_free(money):
     return money["shem"] == 0 and money["gelt"] == 0
 
+def is_more(m1, m2):
+    return True if m1["shem"] + m1["gelt"] > m2["shem"] + m2["gelt"] else False
+
 def flip(money):
     return {"shem": money["gelt"], "gelt": money["shem"]}
 
@@ -57,16 +69,38 @@ def subtract_money(m1, m2):
 def multiply_money(m, factor):
     return {"shem": m["shem"] * factor, "gelt": m["gelt"] * factor}
 
+def combine_resources(money):
+    return money['shem'] + money['gelt']
+
+
+#ESCROW
+
+def escrow_item(vis_card, player_card, money):
+    return { 'vis_card': vis_card, 'player_card': player_card, 'money': money }
+
+def expected_steal_reward(client, e_item):
+    if client['rank'] < e_item['player_card']['rank']:
+        return None
+    if chance_of_match(client, e_item['vis_card']) is None:
+        return None
+    reward = e_item['money']
+    if(client['rank'] > e_item['vis_card']['rank'] and e_item['money']['gelt'] is 0):
+        reward = flip(reward)
+    # take into account that a steal costs opponent money
+    reward = multiply_money(reward, 2)
+    reward = multiply_money(reward, chance_of_match(client, e_item['vis_card']))
+    reward = subtract_money(reward, money(2, 0))  # take in account the cost of stealing
+    return reward
 
 #BUDGET
+
 def starting_budget():
-    return {'liquid': money(2, 2), 'escrow': [] }
+    return {'liquid': money(2, 2) }
 
-
-def cash_in(budget):
-    for e in budget['escrow']:
-        budget['liquid'] = add_money(budget['liquid'], e)
-    budget['escrow'] = []
+#def cash_in(budget):
+#    for e in budget['escrow']:
+#        budget['liquid'] = add_money(budget['liquid'], e['money'])
+#    budget['escrow'] = []
     
 def liquid_resource_count(budget):
     money = budget['liquid']
@@ -93,11 +127,18 @@ def chance_of_match(client, visitor):
 
 
 def expected_match_reward(client, visitor):
-    cost = actual_match_reward(client, visitor)
+    cost = actual_match_profit(client, visitor)
     if cost is None:
         return None
     return multiply_money(flip(cost), chance_of_match(client, visitor))
 
+
+def actual_match_profit(client, visitor):
+    cost = actual_match_reward(client, visitor)
+    if cost is None or is_free(cost):
+        return cost
+    return max(0, subtract_money(cost, match_cost(client, visitor)))
+    
 
 def actual_match_reward(client, visitor):
     cost = match_cost(client, visitor)
@@ -108,18 +149,6 @@ def actual_match_reward(client, visitor):
     cost[kind(cost)] += visitor["rank"]
     return cost
 
-
-client_cards = get_deck()
-visitor_cards = get_deck()
-
-handsize = 4
-num_visitors = 2
-
-my_hand = deal_from(client_cards, handsize)
-my_budget = starting_budget()
-your_hand = deal_from(client_cards, handsize)
-your_budget = starting_budget()
-visitors = deal_from(visitor_cards, num_visitors)
 
 def print_cost_and_reward(client, visitor):
     m = match_cost(client, visitor)
@@ -138,100 +167,120 @@ def print_cost_and_reward(client, visitor):
 def card_match(player_idx, vis_idx, reward):
     return {'player_idx': player_idx, 'vis_idx': vis_idx, 'reward':reward}
 
-def find_best_play(player_hand):
+def find_best_play(player):
+    player_hand = player['hand']
     best_play = None
+    ### Check the visitor cards on the table
     for player_idx, player_card in enumerate(player_hand):
         for vis_idx, visitor_card in enumerate(visitors):
             reward = expected_match_reward(player_card, visitor_card)
             if reward != None:
-                if best_play == None or reward > best_play['reward']:
+                if best_play == None or is_more(reward, best_play['reward']):
                     best_play = card_match(player_idx, vis_idx, reward)
-    return best_play
+    ### Check visitor cards claimed by opponent for possible steal 
+    print "refactor so that won cards stay in visitor's possesion until end of round"
+    return best_play ### doing this for now, later add back stealing
+#    opponents_escrow = []
+#    if player_hand is my_hand:
+#        opponents_escrow = your_budget['escrow']
+#    else:
+#        opponents_escrow = my_budget['escrow']
+#    for player_idx, player_card in enumerate(player_hand):
+#        for escrow_idx, e_item in enumerate(opponents_escrow):
+#            reward = expected_steal_reward(player_card, e_item)             
+#            if reward is not None:
+#                if best_play == None or combine_resources(reward) >= combine_resources(best_play['reward']):
+#                    print "Planning to steal card!"
+#                    best_play = card_match(player_idx, escrow_idx, reward)  
+#    return best_play
 
-def take_turn(hand, budget):
-    play = find_best_play(hand)
-    if play is None:
+def take_turn(player):
+    best_play = find_best_play(player)
+    if best_play is None:
         return
-    p_card = hand[play['player_idx']]
-    v_card = visitors[play['vis_idx']]
-    subtract_money(budget['liquid'], match_cost(p_card,v_card))
+    hand = player['hand']
+    budget = player['budget']
+    p_card = hand[best_play['player_idx']]
+    v_card = visitors[best_play['vis_idx']]
+    budget['liquid'] = subtract_money(budget['liquid'], match_cost(p_card,v_card))
     if random() <= chance_of_match(p_card,v_card):
-        budget['escrow'].append(actual_match_reward(p_card,v_card))
-        del visitors[play['vis_idx']] 
-    del hand[play['player_idx']]      
+        # (card, owner, player_card, money)
+        claimed_visitor_cards.append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
+        del visitors[best_play['vis_idx']] 
+    del hand[best_play['player_idx']]      
 
 def play_round(first_player):    
-    print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (my_hand, your_hand, visitors)
-    if first_player == 1:
-        take_turn(my_hand, my_budget)  
-        take_turn(your_hand, your_budget) 
+    print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], visitors)
+    take_turn(first_player)    
+    if first_player is player1:
+        take_turn(player2) 
     else: 
-        take_turn(your_hand, your_budget)
-        take_turn(my_hand, my_budget) 
+        take_turn(player1) 
     # print "\n\tTURN END:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (my_hand, your_hand, visitors)
-    if find_best_play(my_hand) is not None or find_best_play(your_hand) is not None:
+    if find_best_play(player1) is not None or find_best_play(player2) is not None:
         play_round(first_player)    
     
 def end_round_bookkeeping():
     ### deal cards
     global visitors
     visitors.extend(deal_from(visitor_cards, num_visitors))
-    my_hand.extend(deal_from(client_cards, handsize - len(my_hand)))
-    your_hand.extend(deal_from(client_cards, handsize - len(your_hand)))
+    player1['hand'].extend(deal_from(client_cards, handsize - len(player1['hand'])))
+    player2['hand'].extend(deal_from(client_cards, handsize - len(player2['hand'])))
     ### update player resources
-    cash_in(my_budget)
-    cash_in(your_budget)
-    print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (my_budget, your_budget)
+    print "Need to refactor cash_in"
+    #cash_in(my_budget)
+    #cash_in(your_budget)
+    print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (player1['budget'], player2['budget'])
 
 # the winner is whoever has the most total resources (i.e. shem + gelt)
-def determine_leader(budget1, budget2):
-    player1_res = liquid_resource_count(budget1) 
-    player2_res = liquid_resource_count(budget2) 
+def determine_leader(p1, p2):
+    player1_res = liquid_resource_count(p1['budget']) 
+    player2_res = liquid_resource_count(p2['budget']) 
     if player1_res == player2_res:
-        return 0
+        return None
     elif player1_res > player2_res:
-        return 1
+        return player1
     else:
-        return 2
+        return player2
     
-def determine_first_player(budget1, budget2):
-    leader = determine_leader(budget1, budget2)
-    if leader == 0:
-        return randint(1,2)
-    elif leader == 1:
-        return 2
-    else:
-        return 1
+def determine_first_player(p1, p2):
+    leader = determine_leader(p1, p2)
+    if leader is player1:
+        return player2
+    elif leader == player2:
+        return player1
+    elif 1 == randint(1,2):
+        return player1
+    else: 
+        return player2
         
     
 def play_game():  
     print "STARTING GAME"
     count = 1
-    while len(client_cards) > 0 and len(visitor_cards) > 0 and len(my_hand) == handsize and len(your_hand) == handsize: 
+    while len(client_cards) > 0 and len(visitor_cards) > 0 and len(player1['hand']) == handsize and len(player2['hand']) == handsize: 
         print "\nRound %s:" % (count)
         print "\t\t%s remain in client cards, %s in visitor_cards" % (len(client_cards), len(visitor_cards))
-        play_round(determine_first_player(my_budget, your_budget))
+        play_round(determine_first_player(player1, player2))
         end_round_bookkeeping()
-        count += 1
-    print "\nGAME OVER: Player %s won (0 indicates tie)\n" % (determine_leader(my_budget, your_budget))
+        count += 1   
+    print "\nGAME OVER: Player %s won (0 indicates tie)\n" % ("1" if player1 is determine_leader(player1, player2) else "2"  )
 
 def reset_game():
-    global client_cards, visitor_cards, my_hand, my_budget,your_hand,your_budget,visitors;
+    global client_cards, visitor_cards, visitors, player1, player2
     client_cards = get_deck()
     visitor_cards = get_deck()
-    my_hand = deal_from(client_cards, handsize)
-    my_budget = starting_budget()
-    your_hand = deal_from(client_cards, handsize)
-    your_budget = starting_budget()
+    player1 = player(deal_from(client_cards, handsize), starting_budget())
+    player2 = player(deal_from(client_cards, handsize), starting_budget())
     visitors = deal_from(visitor_cards, num_visitors)
     
 def game_result():
     return { 'tie':0,'player1':0,'player2':0 }
 
-def add_game_result(result, outcome):
-    if outcome == 0:
+def add_game_result(result, leader):
+    if leader == None:
         result['tie'] += 1
-    elif outcome == 1:
+    elif leader == player1:
         result['player1'] += 1
     else:
         result['player2'] += 1
@@ -241,9 +290,25 @@ def run_analysis():
     total_results = game_result()
     for x in range(0, 1000):
         play_game()
-        add_game_result(total_results, determine_leader(my_budget, your_budget))
+        add_game_result(total_results, determine_leader(player1, player2))
         reset_game()
     print total_results
+    
+    
+### Globals 
+client_cards = get_deck()
+visitor_cards = get_deck()
+
+handsize = 4
+num_visitors = 2
+
+player1 = player(deal_from(client_cards, handsize), starting_budget())
+player2 = player(deal_from(client_cards, handsize), starting_budget()) 
+
+visitors = deal_from(visitor_cards, num_visitors)
+claimed_visitor_cards = []
+        
+    
     
 run_analysis()
 
