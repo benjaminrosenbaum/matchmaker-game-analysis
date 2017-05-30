@@ -95,19 +95,18 @@ def expected_steal_reward(client, e_item):
 #BUDGET
 
 def starting_budget():
-    return {'liquid': money(2, 2) }
+    return money(2, 2)
 
 def distribute_winnings():
     for c in the_visitors['claimed_cards']:
-        c['owner']['budget']['liquid'] = add_money(c['owner']['budget']['liquid'], c['money'])
+        c['owner']['budget'] = add_money(c['owner']['budget'], c['money'])
     the_visitors['claimed_cards'] = []
     
-def liquid_resource_count(budget):
-    money = budget['liquid']
-    return money['shem'] + money['gelt']
+def resource_count(budget):
+    return budget['shem'] + budget['gelt']
 
 def can_afford(budget, cost):
-    return budget['liquid']['shem'] >= cost['shem'] and budget['liquid']['gelt'] >= cost['gelt']
+    return budget['shem'] >= cost['shem'] and budget['gelt'] >= cost['gelt']
 
 
 #AI
@@ -210,7 +209,7 @@ def take_turn(player):
     vis_hand = the_visitors['hand']
     p_card = hand[best_play['player_idx']]
     v_card = vis_hand[best_play['vis_idx']]
-    budget['liquid'] = subtract_money(budget['liquid'], match_cost(p_card,v_card))
+    budget = subtract_money(budget, match_cost(p_card,v_card))
     if random() <= chance_of_match(p_card,v_card):
         # (card, owner, player_card, money)
         the_visitors['claimed_cards'].append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
@@ -236,15 +235,14 @@ def end_round_bookkeeping():
     the_visitors['hand'].extend(deal_from(visitor_cards, num_visitors))
     player1['hand'].extend(deal_from(client_cards, handsize - len(player1['hand'])))
     player2['hand'].extend(deal_from(client_cards, handsize - len(player2['hand'])))
-    ### update player resources
     distribute_winnings()
     print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (player1['budget'], player2['budget'])
 
     
 # the winner is whoever has the most total resources (i.e. shem + gelt)
 def determine_leader(p1, p2):
-    player1_res = liquid_resource_count(p1['budget']) 
-    player2_res = liquid_resource_count(p2['budget']) 
+    player1_res = resource_count(p1['budget']) 
+    player2_res = resource_count(p2['budget']) 
     if player1_res == player2_res:
         return None
     elif player1_res > player2_res:
