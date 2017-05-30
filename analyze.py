@@ -13,6 +13,9 @@ def flatten(l):
 def player(hand, budget):
     return {'hand': hand, 'budget': budget }
 
+def visitors(hand):
+    return {'hand': hand, 'claimed_cards':[]}
+
 #PROSPECTS
 def boy(rank):
     return {'rank': rank, 'sex': 'm'}
@@ -73,10 +76,7 @@ def combine_resources(money):
     return money['shem'] + money['gelt']
 
 
-#ESCROW
-
-def escrow_item(vis_card, player_card, money):
-    return { 'vis_card': vis_card, 'player_card': player_card, 'money': money }
+#STEALING
 
 def expected_steal_reward(client, e_item):
     if client['rank'] < e_item['player_card']['rank']:
@@ -172,13 +172,13 @@ def find_best_play(player):
     best_play = None
     ### Check the visitor cards on the table
     for player_idx, player_card in enumerate(player_hand):
-        for vis_idx, visitor_card in enumerate(visitors):
+        for vis_idx, visitor_card in enumerate(the_visitors['hand']):
             reward = expected_match_reward(player_card, visitor_card)
             if reward != None:
                 if best_play == None or is_more(reward, best_play['reward']):
                     best_play = card_match(player_idx, vis_idx, reward)
     ### Check visitor cards claimed by opponent for possible steal 
-    print "refactor so that won cards stay in visitor's possesion until end of round"
+    print "Add in checking claimed visitor cards for stealing"
     return best_play ### doing this for now, later add back stealing
 #    opponents_escrow = []
 #    if player_hand is my_hand:
@@ -200,17 +200,18 @@ def take_turn(player):
         return
     hand = player['hand']
     budget = player['budget']
+    vis_hand = the_visitors['hand']
     p_card = hand[best_play['player_idx']]
-    v_card = visitors[best_play['vis_idx']]
+    v_card = vis_hand[best_play['vis_idx']]
     budget['liquid'] = subtract_money(budget['liquid'], match_cost(p_card,v_card))
     if random() <= chance_of_match(p_card,v_card):
         # (card, owner, player_card, money)
-        claimed_visitor_cards.append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
-        del visitors[best_play['vis_idx']] 
+        the_visitors['claimed_cards'].append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
+        del vis_hand[best_play['vis_idx']] 
     del hand[best_play['player_idx']]      
 
 def play_round(first_player):    
-    print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], visitors)
+    print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], the_visitors['hand'])
     take_turn(first_player)    
     if first_player is player1:
         take_turn(player2) 
@@ -222,8 +223,8 @@ def play_round(first_player):
     
 def end_round_bookkeeping():
     ### deal cards
-    global visitors
-    visitors.extend(deal_from(visitor_cards, num_visitors))
+    global the_visitors
+    the_visitors['hand'].extend(deal_from(visitor_cards, num_visitors))
     player1['hand'].extend(deal_from(client_cards, handsize - len(player1['hand'])))
     player2['hand'].extend(deal_from(client_cards, handsize - len(player2['hand'])))
     ### update player resources
@@ -267,12 +268,12 @@ def play_game():
     print "\nGAME OVER: Player %s won (0 indicates tie)\n" % ("1" if player1 is determine_leader(player1, player2) else "2"  )
 
 def reset_game():
-    global client_cards, visitor_cards, visitors, player1, player2
+    global client_cards, visitor_cards, the_visitors, player1, player2
     client_cards = get_deck()
     visitor_cards = get_deck()
     player1 = player(deal_from(client_cards, handsize), starting_budget())
     player2 = player(deal_from(client_cards, handsize), starting_budget())
-    visitors = deal_from(visitor_cards, num_visitors)
+    the_visitors = visitors(deal_from(visitor_cards, num_visitors))
     
 def game_result():
     return { 'tie':0,'player1':0,'player2':0 }
@@ -305,8 +306,7 @@ num_visitors = 2
 player1 = player(deal_from(client_cards, handsize), starting_budget())
 player2 = player(deal_from(client_cards, handsize), starting_budget()) 
 
-visitors = deal_from(visitor_cards, num_visitors)
-claimed_visitor_cards = []
+the_visitors = visitors(deal_from(visitor_cards, num_visitors))
         
     
     
