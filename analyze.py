@@ -183,10 +183,9 @@ def card_match(player_idx, vis_idx, reward, stealing):
 
 
 def find_best_play(player):
-    player_hand = player['hand']
     best_play = None
     ### Check the visitor cards on the table
-    for player_idx, player_card in enumerate(player_hand):
+    for player_idx, player_card in enumerate(player['hand']):
         for vis_idx, visitor_card in enumerate(the_visitors['hand']):
             cost = match_cost(player_card, visitor_card)
             if cost is not None and not can_afford(player['budget'], cost):
@@ -200,36 +199,36 @@ def find_best_play(player):
     return best_play 
 
 def take_turn(player):
+    print "\n\tTurn Start:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], the_visitors['hand'])
     best_play = find_best_play(player)
     if best_play is None:
         return
-    hand = player['hand']
-    budget = player['budget']
-    p_card = hand[best_play['player_idx']]
+    p_card = player['hand'][best_play['player_idx']]
     if 0 is best_play['stealing']:
         v_card = the_visitors['hand'][best_play['vis_idx']]
     else:    
-        print "Planning to steal card!"  
-        budget = subtract_money(budget, money(2,0)) # cost of stealing
+        player['budget'] = subtract_money(player['budget'], money(2,0)) # cost of stealing
         v_card = the_visitors['claimed_cards'][best_play['vis_idx']]['v_card']
-    budget = subtract_money(budget, match_cost(p_card,v_card))
+    player['budget'] = subtract_money(player['budget'], match_cost(p_card,v_card))   
     if random() <= chance_of_match(p_card,v_card):
         if 0 is best_play['stealing']:
+            print "\n\t\tSuccessfully Matched!"
             the_visitors['claimed_cards'].append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
             del the_visitors['hand'][best_play['vis_idx']]
         else:
-            print "Stole card!"
+            print "\n\t\tStole card!"
             stolen = the_visitors['claimed_cards'][best_play['vis_idx']]
             stolen['owner'] = player
             stolen['p_card'] = p_card
             stolen['money'] = add_money(stolen['money'], match_cost(p_card, v_card))
     elif 1 is best_play['stealing']:
-        print "Yikes, tried to steal & failed!"
-    del hand[best_play['player_idx']]      
+        print "\n\t\tYikes, tried to steal & failed!"
+    else:
+        print "\n\t\tUnsuccessful match!"
+    del player['hand'][best_play['player_idx']]      
 
     
 def play_round(first_player):    
-    print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], the_visitors['hand'])
     take_turn(first_player)    
     if first_player is player1:
         take_turn(player2) 
@@ -238,8 +237,8 @@ def play_round(first_player):
     # print "\n\tTURN END:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (my_hand, your_hand, visitors)
     if find_best_play(player1) is not None or find_best_play(player2) is not None:
         play_round(first_player)    
-   
 
+        
 def end_round_bookkeeping():
     ### deal cards
     global the_visitors
@@ -260,7 +259,6 @@ def determine_leader(p1, p2):
         return player1
     else:
         return player2
- 
 
 def determine_first_player(p1, p2):
     leader = determine_leader(p1, p2)
@@ -278,7 +276,7 @@ def play_game():
     print "STARTING GAME"
     count = 1
     while len(client_cards) > 0 and len(visitor_cards) > 0 and len(player1['hand']) == handsize and len(player2['hand']) == handsize: 
-        print "\nRound %s:" % (count)
+        print "\nROUND %s:" % (count)
         print "\t\t%s remain in client cards, %s in visitor_cards" % (len(client_cards), len(visitor_cards))
         play_round(determine_first_player(player1, player2))
         end_round_bookkeeping()
