@@ -97,14 +97,17 @@ def expected_steal_reward(client, e_item):
 def starting_budget():
     return {'liquid': money(2, 2) }
 
-#def cash_in(budget):
-#    for e in budget['escrow']:
-#        budget['liquid'] = add_money(budget['liquid'], e['money'])
-#    budget['escrow'] = []
+def distribute_winnings():
+    for c in the_visitors['claimed_cards']:
+        c['owner']['budget']['liquid'] = add_money(c['owner']['budget']['liquid'], c['money'])
+    the_visitors['claimed_cards'] = []
     
 def liquid_resource_count(budget):
     money = budget['liquid']
     return money['shem'] + money['gelt']
+
+def can_afford(budget, cost):
+    return budget['liquid']['shem'] >= cost['shem'] and budget['liquid']['gelt'] >= cost['gelt']
 
 
 #AI
@@ -167,12 +170,16 @@ def print_cost_and_reward(client, visitor):
 def card_match(player_idx, vis_idx, reward):
     return {'player_idx': player_idx, 'vis_idx': vis_idx, 'reward':reward}
 
+
 def find_best_play(player):
     player_hand = player['hand']
     best_play = None
     ### Check the visitor cards on the table
     for player_idx, player_card in enumerate(player_hand):
         for vis_idx, visitor_card in enumerate(the_visitors['hand']):
+            cost = match_cost(player_card, visitor_card)
+            if cost is not None and not can_afford(player['budget'], cost):
+                continue
             reward = expected_match_reward(player_card, visitor_card)
             if reward != None:
                 if best_play == None or is_more(reward, best_play['reward']):
@@ -210,6 +217,7 @@ def take_turn(player):
         del vis_hand[best_play['vis_idx']] 
     del hand[best_play['player_idx']]      
 
+    
 def play_round(first_player):    
     print "\n\tTURN START:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (player1['hand'], player2['hand'], the_visitors['hand'])
     take_turn(first_player)    
@@ -220,7 +228,8 @@ def play_round(first_player):
     # print "\n\tTURN END:\n\tMy hand:\t%s \n\tYour hand:\t%s \n\tVisitors:\t%s" % (my_hand, your_hand, visitors)
     if find_best_play(player1) is not None or find_best_play(player2) is not None:
         play_round(first_player)    
-    
+   
+
 def end_round_bookkeeping():
     ### deal cards
     global the_visitors
@@ -228,11 +237,10 @@ def end_round_bookkeeping():
     player1['hand'].extend(deal_from(client_cards, handsize - len(player1['hand'])))
     player2['hand'].extend(deal_from(client_cards, handsize - len(player2['hand'])))
     ### update player resources
-    print "Need to refactor cash_in"
-    #cash_in(my_budget)
-    #cash_in(your_budget)
+    distribute_winnings()
     print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (player1['budget'], player2['budget'])
 
+    
 # the winner is whoever has the most total resources (i.e. shem + gelt)
 def determine_leader(p1, p2):
     player1_res = liquid_resource_count(p1['budget']) 
@@ -243,7 +251,8 @@ def determine_leader(p1, p2):
         return player1
     else:
         return player2
-    
+ 
+
 def determine_first_player(p1, p2):
     leader = determine_leader(p1, p2)
     if leader is player1:
@@ -308,7 +317,6 @@ player2 = player(deal_from(client_cards, handsize), starting_budget())
 
 the_visitors = visitors(deal_from(visitor_cards, num_visitors))
         
-    
     
 run_analysis()
 
