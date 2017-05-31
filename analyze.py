@@ -26,6 +26,7 @@ def girl(rank):
 def suits(value):
     return [{'rank': value, 'sex': 'm'}, {'rank': value, 'sex': 'f'}] * 2
 
+
 #CARDS
 def card(rank, sex):
     return {'rank': rank, 'sex': sex }
@@ -37,7 +38,6 @@ def get_deck():
     d = flatten([suits(a + 1) for a in range(7)])
     shuffle(d)
     return deepcopy(d)
-
 
 def deal_from(deck, how_many):
     if len(deck) < how_many:
@@ -76,8 +76,41 @@ def combine_resources(money):
     return money['shem'] + money['gelt']
 
 
-#STEALING
+#CHOICES
+def choice(diff, cost):
+    return { 'diff': diff, 'cost': cost, 'claimed': False }
 
+def marry_up_choices(): #we start the list with none so that the index & difference are the same
+    return [ None, choice(1, money(0,1)), choice(2, money(0,2)), choice(3, money(0,3)) ]
+
+def marry_down_choices():  #we start the list with none so that the index & difference are the same
+    return [ None, choice(1, money(1,0)), choice(2, money(2,0)), choice(3, money(3,0)) ]
+
+def is_choice_available(v_card, p_card):
+    diff = v_card['rank'] - p_card['rank']
+    if diff is 0:
+        return True
+    if diff > 3 or diff < -3:
+        return False
+    if diff > 0:
+        return not choice_marry_up[diff]['claimed']
+    else:
+        return not choice_marry_up[diff*-1]['claimed']
+    
+def claim_choice(v_card, p_card):
+    diff = v_card['rank'] - p_card['rank']
+    if diff is 0:
+        return 
+    if diff > 3 or diff < -3:
+        print "Illegal choice!"
+        return 
+    if diff > 0:
+        choice_marry_up[diff]['claimed'] = True
+    else:
+        choice_marry_up[diff*-1]['claimed'] = True
+    
+
+#STEALING
 def consider_stealing(player, best_play):
     for p_idx, p_card in enumerate(player['hand']):
         for c_idx, claimed_card in enumerate(the_visitors['claimed_cards']):
@@ -187,6 +220,11 @@ def find_best_play(player):
     ### Check the visitor cards on the table
     for player_idx, player_card in enumerate(player['hand']):
         for vis_idx, visitor_card in enumerate(the_visitors['hand']):
+            # check and see if choice is available
+            # if not is_choice_available(visitor_card, player_card):
+                # print "Oh noes! Choice taken!"
+                continue
+            # check can afford cost of match
             cost = match_cost(player_card, visitor_card)
             if cost is not None and not can_afford(player['budget'], cost):
                 continue
@@ -213,6 +251,7 @@ def take_turn(player):
     if random() <= chance_of_match(p_card,v_card):
         if 0 is best_play['stealing']:
             print "\n\t\tSuccessfully Matched!"
+            claim_choice(v_card, p_card)
             the_visitors['claimed_cards'].append(claimed_visitor_card(player, p_card, v_card,actual_match_reward(p_card,v_card)))
             del the_visitors['hand'][best_play['vis_idx']]
         else:
@@ -246,6 +285,8 @@ def end_round_bookkeeping():
     player1['hand'].extend(deal_from(client_cards, handsize - len(player1['hand'])))
     player2['hand'].extend(deal_from(client_cards, handsize - len(player2['hand'])))
     distribute_winnings()
+    choice_marry_up = marry_up_choices()
+    choice_marry_down = marry_down_choices()
     print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (player1['budget'], player2['budget'])
 
     
@@ -290,6 +331,8 @@ def reset_game():
     player1 = player(deal_from(client_cards, handsize), starting_budget())
     player2 = player(deal_from(client_cards, handsize), starting_budget())
     the_visitors = visitors(deal_from(visitor_cards, num_visitors))
+    choice_marry_up = marry_up_choices()
+    choice_marry_down = marry_down_choices()
     
 def game_result():
     return { 'tie':0,'player1':0,'player2':0 }
@@ -321,6 +364,9 @@ num_visitors = 2
 
 player1 = player(deal_from(client_cards, handsize), starting_budget())
 player2 = player(deal_from(client_cards, handsize), starting_budget()) 
+
+choice_marry_up = marry_up_choices()
+choice_marry_down = marry_down_choices()
 
 the_visitors = visitors(deal_from(visitor_cards, num_visitors))
         
