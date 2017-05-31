@@ -221,7 +221,7 @@ def find_best_play(player):
     for player_idx, player_card in enumerate(player['hand']):
         for vis_idx, visitor_card in enumerate(the_visitors['hand']):
             # check and see if choice is available
-            # if not is_choice_available(visitor_card, player_card):
+            if not is_choice_available(visitor_card, player_card):
                 # print "Oh noes! Choice taken!"
                 continue
             # check can afford cost of match
@@ -242,11 +242,13 @@ def take_turn(player):
     if best_play is None:
         return
     p_card = player['hand'][best_play['player_idx']]
-    if 0 is best_play['stealing']:
-        v_card = the_visitors['hand'][best_play['vis_idx']]
-    else:    
+    total_results['attempted_actions'] = total_results['attempted_actions'] + 1
+    if 1 is best_play['stealing']:
+        total_results['attempted_steals'] = total_results['attempted_steals'] + 1
         player['budget'] = subtract_money(player['budget'], money(2,0)) # cost of stealing
         v_card = the_visitors['claimed_cards'][best_play['vis_idx']]['v_card']
+    else:    
+        v_card = the_visitors['hand'][best_play['vis_idx']]
     player['budget'] = subtract_money(player['budget'], match_cost(p_card,v_card))   
     if random() <= chance_of_match(p_card,v_card):
         if 0 is best_play['stealing']:
@@ -325,7 +327,7 @@ def play_game():
     print "\nGAME OVER: Player %s won (0 indicates tie)\n" % ("1" if player1 is determine_leader(player1, player2) else "2"  )
 
 def reset_game():
-    global client_cards, visitor_cards, the_visitors, player1, player2
+    global client_cards, visitor_cards, the_visitors, player1, player2, choice_marry_up, choice_marry_down, total_results
     client_cards = get_deck()
     visitor_cards = get_deck()
     player1 = player(deal_from(client_cards, handsize), starting_budget())
@@ -335,7 +337,7 @@ def reset_game():
     choice_marry_down = marry_down_choices()
     
 def game_result():
-    return { 'tie':0,'player1':0,'player2':0 }
+    return { 'tie':0,'player1':0,'player2':0, 'attempted_actions':0, 'attempted_steals': 0 }
 
 def add_game_result(result, leader):
     if leader == None:
@@ -347,15 +349,18 @@ def add_game_result(result, leader):
     return result    
 
 def run_analysis():
-    total_results = game_result()
+    global total_results
     for x in range(0, 1000):
         play_game()
         add_game_result(total_results, determine_leader(player1, player2))
         reset_game()
     print total_results
+    total_results = game_result()
     
     
 ### Globals 
+total_results = game_result()
+
 client_cards = get_deck()
 visitor_cards = get_deck()
 
