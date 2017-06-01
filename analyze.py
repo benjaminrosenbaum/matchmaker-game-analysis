@@ -80,26 +80,28 @@ def combine_resources(money):
 def choice(diff, cost):
     return { 'diff': diff, 'cost': cost, 'claimed': False }
 
+# stealing always cost 2 shem, unlimited number of stealing
 def steal_choices(): #we start the list with none so that the index & difference are the same
     return [ choice(None, money(2,0)), choice(None, money(3,0)), choice(None, money(4,0)), choice(None, money(5,0)) ]
 
 def claim_next_steal_choice(choices):
+    return # stealing always cost 2 shem, unlimited number of stealing
     for s in choices:
         if s['claimed'] is False:
             s['claimed'] = True
             return
-
-def marry_up_choices(): #we start the list with none so that the index & difference are the same
-    return [ None, choice(1, money(0,1)), choice(2, money(0,2)), choice(3, money(0,3)) ]
-
-def marry_down_choices():  #we start the list with none so that the index & difference are the same
-    return [ None, choice(1, money(1,0)), choice(2, money(2,0)), choice(3, money(3,0)) ]
-
+        
 def get_steal_cost(choices):
     for s in choices:
         if s['claimed'] is False:
             return s['cost']
-    return None    
+    return None          
+        
+def marry_up_choices(): #we start the list with none so that the index & difference are the same
+    return [ None, choice(1, money(0,1)), choice(2, money(0,2)), choice(3, money(0,3)) ]
+
+def marry_down_choices():  #we start the list with none so that the index & difference are the same
+    return [ None, choice(1, money(1,0)), choice(2, money(2,0)), choice(3, money(3,0)) ]  
 
 def is_choice_available(v_card, p_card):
     diff = v_card['rank'] - p_card['rank']
@@ -304,6 +306,7 @@ def play_round(first_player):
 
         
 def end_round_bookkeeping():
+    global last_leader, rounds_in_lead
     ### deal cards
     global the_visitors
     the_visitors['hand'].extend(deal_from(visitor_cards, num_visitors))
@@ -312,6 +315,12 @@ def end_round_bookkeeping():
     distribute_winnings()
     choice_marry_up = marry_up_choices()
     choice_marry_down = marry_down_choices()
+    current_leader = 1 if player1 is determine_leader(player1, player2) else 2
+    if current_leader == last_leader:
+        rounds_in_lead = rounds_in_lead + 1
+    else:
+        last_leader = current_leader
+        rounds_in_lead = 1
     print "\n\tBUDGET:\n\tMy budget:\t%s\n\tYour budget:\t%s" % (player1['budget'], player2['budget'])
 
     
@@ -339,6 +348,7 @@ def determine_first_player(p1, p2):
         
     
 def play_game():  
+    global rounds_in_lead
     print "STARTING GAME"
     count = 1
     while len(client_cards) > 0 and len(visitor_cards) > 0 and len(player1['hand']) == handsize and len(player2['hand']) == handsize: 
@@ -347,11 +357,14 @@ def play_game():
         play_round(determine_first_player(player1, player2))
         end_round_bookkeeping()
         count += 1   
+    total_results['number_rounds'] = total_results['number_rounds'] + count
+    total_results['last_lead_rounds'] = total_results['last_lead_rounds'] + rounds_in_lead
     print "\nGAME OVER: Player %s won (0 indicates tie)\n" % ("1" if player1 is determine_leader(player1, player2) else "2"  )
 
 def reset_game():
     global client_cards, visitor_cards, the_visitors, player1, player2
     global choice_steal, choice_marry_up, choice_marry_down, total_results
+    global last_leader, rounds_in_lead
     client_cards = get_deck()
     visitor_cards = get_deck()
     player1 = player(deal_from(client_cards, handsize), starting_budget())
@@ -360,9 +373,11 @@ def reset_game():
     choice_marry_up = marry_up_choices()
     choice_marry_down = marry_down_choices()
     choice_steal = steal_choices()
+    last_leader = 0
+    rounds_in_lead = 0
     
 def game_result():
-    return { 'tie':0,'player1':0,'player2':0, 'attempted_actions':0, 'attempted_steals': 0 }
+    return { 'tie':0,'player1':0,'player2':0, 'attempted_actions':0, 'attempted_steals': 0, 'number_rounds': 0, 'last_lead_rounds':0 }
 
 def add_game_result(result, leader):
     if leader == None:
@@ -401,9 +416,10 @@ choice_steal = steal_choices()
 
 the_visitors = visitors(deal_from(visitor_cards, num_visitors))
         
+last_leader = 0
+rounds_in_lead = 0
     
 run_analysis()
-
 
 #BEN WORK HERE
 
